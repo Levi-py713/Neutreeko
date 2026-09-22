@@ -26,7 +26,7 @@ class Board():
 
     #Checks if you can move in that direction
     def canMove(self, position):
-        if position[0] > len(Board.game_board) or position[0] < 0 or position[1] > len(Board.game_board) or position[1] < 0:
+        if position[0] > len(Board.game_board) - 1 or position[0] < 0 or position[1] > len(Board.game_board) - 1 or position[1] < 0:
             return False
         elif Board.game_board[position[0]][position[1]]!= '_': 
             return False
