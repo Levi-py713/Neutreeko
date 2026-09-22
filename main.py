@@ -1,5 +1,6 @@
-import os
+import subprocess
 class Board():
+    turn = 0
     moveSet = {'N': [-1, 0], 'E': [0, 1], 'S': [1, 0], 'W': [0, -1], 'NE': [-1, 1], 'NW': [-1, -1], 'SE': [1, 1], 'SW': [1, -1]}
 
     white_position = [[0, 1], [1, 3], [3, 2]]
@@ -34,7 +35,7 @@ class Board():
             return True
             # Check if position is primitive, else moves position
 
-    def DoMove(self, name:str, position: list[int], move: str): 
+    def DoMove(self, piece: int, position: list[int], move: str): 
 
 
         current_position = [position[0], position[1]]
@@ -42,10 +43,13 @@ class Board():
         while self.canMove([position[0] + self.moveSet[move][0], position[1] + self.moveSet[move][1]]):
             position[0] += self.moveSet[move][0]
             position[1] += self.moveSet[move][1]
-            print(position)
 
-        Board.game_board[current_position[0]][current_position[1]] = '_'
-        Board.game_board[position[0]][position[1]] = name
+        if current_position == [position[0], position[1]]:
+            return "Didn't Move"
+        
+        self.game_board[current_position[0]][current_position[1]] = '_'
+        self.game_board[position[0]][position[1]] = f'{'W' if self.turn else 'B'}{piece}'
+        self.turn = 1 - self.turn
 
         return "Moved"
 
@@ -87,20 +91,27 @@ class Board():
         return False
 
 def main():
-    turn = "black"
-    not_turn = "white"
     x = Board()
     while not x.IsPrimitive():
         print(x)
-        move = input(f'Turn: {turn}, pick a piece and move (e.g B1N): ')
-        os.system('clear')
-        if turn == 'black':
-            x.DoMove(move[:2], x.black_position[int(move[1]) - 1], move[2:])
-        else:
-            x.DoMove(move[:2], x.white_position[int(move[1]) - 1], move[2:])
-        turn, not_turn = not_turn, turn
+        catch = True
+        while catch:
+            move = input(f'Turn: {'white' if x.turn else 'black'}, pick a piece and move (e.g 1N): ')
+            if ((len(move) == 2 or len(move) == 3) and (move[0] == '1' or move[0] == '2' or move[0] == '3') and (move[1:] in Board.moveSet)):
+                if not x.turn:
+                    valid = x.DoMove(move[0] , x.black_position[int(move[0]) - 1], move[1:])
+                else:
+                    valid = x.DoMove(move[0] , x.white_position[int(move[0]) - 1], move[1:])
+                if valid == "Didn't Move":
+                    print('Sorry! Not a legal move')
+                else:
+                    catch = False
+            else:
+                print('Sorry! Not a legal move')
+            
+
     print(x)
-    print(f'{not_turn} has won!')
+    print(f'{'Black' if x.turn else 'White'} has won!')
 
 
 
