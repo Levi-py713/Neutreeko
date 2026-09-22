@@ -1,4 +1,4 @@
-import subprocess
+import os
 class Board():
     turn = 0
     moveSet = {'N': [-1, 0], 'E': [0, 1], 'S': [1, 0], 'W': [0, -1], 'NE': [-1, 1], 'NW': [-1, -1], 'SE': [1, 1], 'SW': [1, -1]}
@@ -7,15 +7,17 @@ class Board():
     black_position = [[1, 2], [4, 1], [4, 3]]
     
     game_board = [
-                    ['_', 'W1', '_', 'W2', '_'],
-                    ['_', '_', 'B1', '_', '_'],
-                    ['_', '_', '_', '_', '_'],
-                    ['_', '_', 'W3', '_', '_'],
-                    ['_', 'B2', '_', 'B3', '_']]
+                    ['__', 'W1', '__', 'W2', '__'],
+                    ['__', '__', 'B1', '__', '__'],
+                    ['__', '__', '__', '__', '__'],
+                    ['__', '__', 'W3', '__', '__'],
+                    ['__', 'B2', '__', 'B3', '__']]
 
     def __str__(self):
         for x in Board.game_board:
-            print(x)
+            for y in x:
+                print(y, end='  ')
+            print('\n')
         return ' '
     # position on board, 'white' or 'black'
     # def __init__(self, position, color):
@@ -29,7 +31,7 @@ class Board():
     def canMove(self, position):
         if position[0] > len(Board.game_board) - 1 or position[0] < 0 or position[1] > len(Board.game_board) - 1 or position[1] < 0:
             return False
-        elif Board.game_board[position[0]][position[1]]!= '_': 
+        elif Board.game_board[position[0]][position[1]]!= '__': 
             return False
         else:
             return True
@@ -47,7 +49,7 @@ class Board():
         if current_position == [position[0], position[1]]:
             return "Didn't Move"
         
-        self.game_board[current_position[0]][current_position[1]] = '_'
+        self.game_board[current_position[0]][current_position[1]] = '__'
         self.game_board[position[0]][position[1]] = f'{'W' if self.turn else 'B'}{piece}'
         self.turn = 1 - self.turn
 
@@ -106,6 +108,7 @@ def main():
                     print('Sorry! Not a legal move')
                 else:
                     catch = False
+                    os.system("clear")
             else:
                 print('Sorry! Not a legal move')
             
