@@ -3,7 +3,7 @@ class Board():
     turn = 0
     moveSet = {'N': [-1, 0], 'E': [0, 1], 'S': [1, 0], 'W': [0, -1], 'NE': [-1, 1], 'NW': [-1, -1], 'SE': [1, 1], 'SW': [1, -1]}
 
-    white_position = [[0, 1], [1, 3], [3, 2]]
+    white_position = [[0, 1], [0, 3], [3, 2]]
     black_position = [[1, 2], [4, 1], [4, 3]]
     
     game_board = [
