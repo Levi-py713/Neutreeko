@@ -3,7 +3,6 @@ from models import Game, Value, StringMode
 
 
 MOVE_ENCODE = {'N': 0, 'E': 1, 'S': 2, 'W': 3, 'NE': 4, 'NW': 5, 'SE': 6, 'SW': 7}
-TIE_CACHE = {}
 
 class Neutreeko():
     id = 'neutreeko'
@@ -17,23 +16,24 @@ class Neutreeko():
         if variant_id not in self.variants:
             raise ValueError('variant not defined')
         self.variant_id = variant_id
-
+        
+        self.tie_cache = {}
         self.board_height = int(variant_id[0])
         self.board_length = int(variant_id[2])
         self.board_size = self.board_length * self.board_height
         self.actual_board_size = self.board_size - 1
         self.directions = {'N': self.board_length, 'E': -1, 'S': -self.board_length, 'W': 1, 'NE': self.board_length - 1, 'NW': self.board_length + 1, 'SE': -self.board_length - 1, 'SW': -self.board_length + 1}
     
-    def _encode(self, black, white, turn):
+    def _encode(self, black, white, turn, add_cache=False):
         number = 10 * turn
         tie_number = 1
         for loc in sorted(black) + sorted(white):
             number = number * self.board_size + loc
             tie_number = tie_number * (loc + 1)
-        if tie_number in TIE_CACHE:
-            TIE_CACHE[tie_number] += 1
-        else:
-            TIE_CACHE[tie_number] = 0
+        if tie_number in self.tie_cache and add_cache:
+            self.tie_cache[tie_number] += 1
+        elif add_cache:
+            self.tie_cache[tie_number] = 0
         return number
 
     def _decode(self, encoding):
@@ -53,12 +53,16 @@ class Neutreeko():
         return self._encode(
             black=(7, 21, 23),
             white=(1, 3, 17),
-            turn=0
+            turn=0,
+            add_cache=True
         )
 
     #Very slow, can be improved and universalized
-    def to_string(self, encode: int):
+    def to_string(self, encode: int, mode: StringMode):
         white, black, turn = self._decode(encode)
+        print(encode, self.tie_cache)
+
+        print(white, black)
 
         board = [[f'B{black.index((self.board_height * column) + row) + 1}' 
                     if ((self.board_height * column) + row in black) 
@@ -89,7 +93,7 @@ class Neutreeko():
             if board_state[0] == '_':
                 counter -= 1
             board_state = board_state[2:]
-        return self._encode(tuple(black_moves), tuple(white_moves), turn)
+        return self._encode(tuple(black_moves), tuple(white_moves), turn, False)
 
     #Checks if you can move in that direction
     def can_move(self, position: int, direction: str, encoding: int):
@@ -105,7 +109,7 @@ class Neutreeko():
     def do_move(self,  encoding: int, encoded_move: int): 
         white, black, turn = self._decode(encoding) 
         piece_number = encoded_move // 8 - 1
-        real_move = list(MOVE_ENCODE)[(encoded_move - turn * 8) % 8]
+        real_move = list(MOVE_ENCODE)[(encoded_move) % 8]
 
         if turn:
             position = white[piece_number]
@@ -127,7 +131,7 @@ class Neutreeko():
             black[piece_number] = position
             black = tuple(black)
 
-        encode = self._encode(black, white, 1 - turn)
+        encode = self._encode(black, white, 1 - turn, True)
 
         return encode
 
@@ -166,7 +170,7 @@ class Neutreeko():
         for loc in sorted(black) + sorted(white):
             number = number * (loc + 1)
 
-        if TIE_CACHE[number] == 2:
+        if self.tie_cache[number] == 2:
             return Value.Draw
 
         just_moved = sorted(black) if turn else sorted(white)
@@ -188,9 +192,9 @@ class Neutreeko():
 
     def move_to_string(self, encoded_move: int, mode: StringMode):
         piece_number = encoded_move // 8 - 1
-        real_move = list(MOVE_ENCODE)[(encoded_move - turn * 8) % 8]
+        real_move = list(MOVE_ENCODE)[encoded_move % 8]
 
-        return f'{piece_number}{real_move}'
+        return f'{piece_number + 1}{real_move}'
 
 
 def main():
@@ -202,7 +206,7 @@ def main():
 
         white, black, turn = x._decode(encode)
 
-        print(x.to_string(encode))
+        print(x.to_string(encode, None))
         if turn:
             print("WHITE'S TURN")
             prime_position = white
@@ -225,7 +229,7 @@ def main():
 
     _, _, turn = x._decode(encode)
     os.system('clear')
-    print(x.to_string(encode))
+    print(x.to_string(encode, None))
     if turn and x.primitive(encode) == Value.Loss:
         print('Black Wins')
         return
@@ -235,4 +239,4 @@ def main():
     return
 
 
-main()
+#main()
