@@ -6,7 +6,7 @@ MOVE_ENCODE = {'N': 0, 'E': 1, 'S': 2, 'W': 3, 'NE': 4, 'NW': 5, 'SE': 6, 'SW': 
 
 class Neutreeko():
     id = 'neutreeko'
-    variants = ['5x5']
+    variants = ['5x5', '6x6', '7x7', '9x9', '11x11', '13x13', '111x111']
     n_players = 2
     cyclic = True
 
@@ -16,70 +16,99 @@ class Neutreeko():
         if variant_id not in self.variants:
             raise ValueError('variant not defined')
         self.variant_id = variant_id
-        
-        self.tie_cache = {}
-        self.board_height = int(variant_id[0])
-        self.board_length = int(variant_id[2])
+
+        self.board_height = int(variant_id[:len(variant_id) // 2])
+        self.board_length = int(variant_id[len(variant_id) // 2 + 1:])
         self.board_size = self.board_length * self.board_height
         self.actual_board_size = self.board_size - 1
         self.directions = {'N': self.board_length, 'E': -1, 'S': -self.board_length, 'W': 1, 'NE': self.board_length - 1, 'NW': self.board_length + 1, 'SE': -self.board_length - 1, 'SW': -self.board_length + 1}
     
-    def _encode(self, black, white, turn, add_cache=False):
+    def _encode(self, black, white, turn):
         number = 10 * turn
-        tie_number = 1
+
+
         for loc in sorted(black) + sorted(white):
             number = number * self.board_size + loc
-            tie_number = tie_number * (loc + 1)
-        if tie_number in self.tie_cache and add_cache:
-            self.tie_cache[tie_number] += 1
-        elif add_cache:
-            self.tie_cache[tie_number] = 0
+
         return number
 
     def _decode(self, encoding):
         locs = []
-        for _ in range(6):
+        for _ in range(2 * self.board_length - 4):
             locs.append(encoding % self.board_size) 
             encoding //= self.board_size
 
         locs.reverse()
-        black = tuple(locs[:3])
-        white = tuple(locs[3:])
+        black = tuple(locs[:len(locs) // 2])
+        white = tuple(locs[len(locs) // 2:])
         turn = encoding // 10
 
         return white, black, turn
 
     def start(self):
+        black = []
+        white = []
+        for x in range(self.board_height // 2):
+            if x % 2 == 0:
+                if x == self.board_height // 2 - 1:
+                    white.append((x * self.board_length) + (x + 1))
+                    black.append((self.board_height * self.board_length - 1) - (x * self.board_height) - x - 1)
+                else:
+                    white.append((x * self.board_length) + (x + 1))
+                    white.append(((x + 1) * self.board_length) - 2 - x)
+                    black.append((self.board_height * self.board_length - 1) - (x * self.board_height) - x - 1)
+                    black.append((self.board_height * self.board_length - 1) - ((x + 1) * self.board_height) + (x + 2))
+
+            else:
+                if x == self.board_height // 2 - 1:
+                    black.append((x * self.board_length) + (x + 1))
+                    white.append((self.board_height * self.board_length - 1) - (x * self.board_height) - x - 1)
+                else:
+                    black.append((x * self.board_length) + (x + 1))
+                    black.append(((x + 1) * self.board_length) - 2 - x)
+                    white.append((self.board_height * self.board_length - 1) - (x * self.board_height) - x - 1)
+                    white.append((self.board_height * self.board_length - 1) - ((x + 1) * self.board_height) + (x + 2))
+
+
         return self._encode(
-            black=(7, 21, 23),
-            white=(1, 3, 17),
-            turn=0,
-            add_cache=True
+            black=tuple(black),
+            white=tuple(white),
+            turn=0
         )
 
     #Very slow, can be improved and universalized
     def to_string(self, encode: int, mode: StringMode):
         white, black, turn = self._decode(encode)
-        print(encode, self.tie_cache)
-
-        print(white, black)
+        if turn:
+            turn = 'White'
+        else:
+            turn = 'Black'
 
         board = [[f'B{black.index((self.board_height * column) + row) + 1}' 
                     if ((self.board_height * column) + row in black) 
                         else f'W{white.index((self.board_height * column) + row) + 1}' 
                             if self.board_height * column + row in white 
-                                else '__' 
+                                else '--' 
                                     for row in reversed(range(self.board_length))] 
                                         for column in reversed(range(self.board_height))]
 
         merged = []
+        item = ''
         for i in range(len(board)):
-            merged.append(board[i][0] + '  ' + board[i][1] + '  ' +  board[i][2] + '  ' +  board[i][3] + '  ' +  board[i][4])
+            for j in range(len(board[0])):
+                item += ' ' 
+                item += board[i][j]
+            merged.append(item)
+            item = ''
 
-        return '\n\n'.join(merged) + f'  Turn: {turn}'
+        return '\n\n'.join(merged) + '\n' + f'Turn: {turn}'
 
     def from_string(self, board_state: str):
-        turn = int(board_state[-1])
+        if board_state[-5] == "B":
+            turn = 0
+        else:
+            turn = 1
+
         black_moves = [0 for _ in range(self.board_length - 2)]
         white_moves = [0 for _ in range(self.board_length - 2)]
         counter = self.actual_board_size
@@ -90,10 +119,10 @@ class Neutreeko():
             if board_state[0] == 'B':
                 black_moves[int(board_state[1]) - 1] = counter
                 counter -= 1
-            if board_state[0] == '_':
+            if board_state[0] == '-':
                 counter -= 1
             board_state = board_state[2:]
-        return self._encode(tuple(black_moves), tuple(white_moves), turn, False)
+        return self._encode(tuple(black_moves), tuple(white_moves), turn)
 
     #Checks if you can move in that direction
     def can_move(self, position: int, direction: str, encoding: int):
@@ -113,7 +142,6 @@ class Neutreeko():
 
         if turn:
             position = white[piece_number]
-
             while self.can_move(position, real_move, encoding):
                 position += self.directions[real_move]
 
@@ -131,7 +159,7 @@ class Neutreeko():
             black[piece_number] = position
             black = tuple(black)
 
-        encode = self._encode(black, white, 1 - turn, True)
+        encode = self._encode(black, white, 1 - turn)
 
         return encode
 
@@ -150,7 +178,7 @@ class Neutreeko():
             position = black
 
         moves = []
-        if self.primitive(encoding):
+        if self.primitive(encoding) !=  None:
             return moves # Maybe switch this, returns []
         else:
             #Moves encoded as piece (0, 1, 2) * move (0, 1, 2, 3, 4, 5, 6, 7)
@@ -166,24 +194,18 @@ class Neutreeko():
         # Grabs where the piece is slightly faster than a for loop
         # I think this would be faster if game stores each position
         white, black, turn = self._decode(encoding)
-        number = 1
-        for loc in sorted(black) + sorted(white):
-            number = number * (loc + 1)
-
-        if self.tie_cache[number] == 2:
-            return Value.Draw
 
         just_moved = sorted(black) if turn else sorted(white)
 
         #All in a row
-        if (just_moved[2] - just_moved[1] == 1 and just_moved[1] - just_moved[0] == 1):
+        if all([just_moved[i + 1] - just_moved[i] == 1 and just_moved[i + 1] // self.board_height == just_moved[i] // self.board_height for i in reversed(range(len(black) - 1))]):
             return Value.Loss
-        elif (just_moved[2] - just_moved[1] == 5 and just_moved[1] - just_moved[0] == self.board_length):
+        elif all([just_moved[i + 1] - just_moved[i] == self.board_length and just_moved[i + 1] // self.board_height - just_moved[i] // self.board_height == 1 for i in reversed(range(len(black) - 1))]):
             return Value.Loss
         #Diagonal Check
-        elif (just_moved[2] - just_moved[1] == 4 and just_moved[1] - just_moved[0] == self.board_length - 1):
+        elif all([just_moved[i + 1] - just_moved[i] == self.board_length - 1 and just_moved[i + 1] // self.board_height - just_moved[i] // self.board_height == 1 for i in reversed(range(len(black) - 1))]):
             return Value.Loss
-        elif (just_moved[2] - just_moved[1] == 6 and just_moved[1] - just_moved[0] == self.board_length + 1):
+        elif all([just_moved[i + 1] - just_moved[i] == self.board_length + 1 and just_moved[i + 1] // self.board_height - just_moved[i] // self.board_height == 1 for i in reversed(range(len(black) - 1))]):
             return Value.Loss
         return None
 
@@ -198,7 +220,7 @@ class Neutreeko():
 
 
 def main():
-    x = Neutreeko('5x5')
+    x = Neutreeko('111x111')
     encode = x.start()
 
     #Turn starts as black
@@ -207,23 +229,32 @@ def main():
         white, black, turn = x._decode(encode)
 
         print(x.to_string(encode, None))
+
         if turn:
-            print("WHITE'S TURN")
             prime_position = white
         else:
-            print("BLACK'S TURN")
             prime_position = black
         statement = True
         
         while statement:
             decoded_move = input('What move would you like to make? Select piece # and DIRECTION, i.e. 1NE: ')
-            if decoded_move[1:] not in MOVE_ENCODE.keys() or (decoded_move[0] != '1' and decoded_move[0] != '2' and decoded_move[0] != '3'):
+            actual_move = ''
+            while decoded_move:
+                if decoded_move[0] in MOVE_ENCODE:
+                    directioned_move = decoded_move[:]
+                    break
+                else:
+                    actual_move += decoded_move[0]
+                decoded_move = decoded_move[1:]
+                
+            if directioned_move not in MOVE_ENCODE.keys() or int(actual_move) < 1 or int(actual_move) > len(black):
                 print('Sorry! Move not valid')
 
-            elif x.can_move(prime_position[int(decoded_move[0]) - 1], decoded_move[1:], encode):
-                encode = x.do_move(encode, MOVE_ENCODE[decoded_move[1:]] + (8 * int(decoded_move[0])))
+            elif x.can_move(prime_position[int(actual_move) - 1], directioned_move, encode):
+                encode = x.do_move(encode, MOVE_ENCODE[directioned_move] + (8 * int(actual_move)))
                 statement = False
             else:
+                print("here")
                 print('Sorry! Move not valid')
         os.system('clear')
 
@@ -233,8 +264,6 @@ def main():
     if turn and x.primitive(encode) == Value.Loss:
         print('Black Wins')
         return
-    elif x.primitive(encode) == Value.Draw:
-        return ("Draw! Three repetitions of board state")
     print('White Wins')
     return
 
