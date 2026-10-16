@@ -3,14 +3,19 @@ from models import Game, Value, StringMode
 
 
 MOVE_ENCODE = {'N': 0, 'E': 1, 'S': 2, 'W': 3, 'NE': 4, 'NW': 5, 'SE': 6, 'SW': 7}
+SYMMETRIES = {}
 
 class Neutreeko():
     id = 'neutreeko'
-    variants = ['5x5', '6x6', '7x7', '9x9', '11x11', '13x13', '111x111']
+    #Can play any variant of square board, not solved though
+    variants = ['5x5', '6x6']
     n_players = 2
     cyclic = True
 
     turn = 0
+
+    #STRING TYPE MAY REMOVE
+    stringType = None
 
     def __init__(self, variant_id: str):
         if variant_id not in self.variants:
@@ -21,11 +26,13 @@ class Neutreeko():
         self.board_length = int(variant_id[len(variant_id) // 2 + 1:])
         self.board_size = self.board_length * self.board_height
         self.actual_board_size = self.board_size - 1
-        self.directions = {'N': self.board_length, 'E': -1, 'S': -self.board_length, 'W': 1, 'NE': self.board_length - 1, 'NW': self.board_length + 1, 'SE': -self.board_length - 1, 'SW': -self.board_length + 1}
+        self.piv_point = self.board_length // 2
+        self.directions = {'N': -self.board_length, 'E': 1, 'S': self.board_length, 'W': -1, 'NE': -self.board_length - 1, 'NW': -self.board_length + 1, 'SE': self.board_length - 1, 'SW': self.board_length + 1}
+
+        # Pre-compute symmetries
     
     def _encode(self, black, white, turn):
-        number = 10 * turn
-
+        number = turn
 
         for loc in sorted(black) + sorted(white):
             number = number * self.board_size + loc
@@ -33,6 +40,7 @@ class Neutreeko():
         return number
 
     def _decode(self, encoding):
+
         locs = []
         for _ in range(2 * self.board_length - 4):
             locs.append(encoding % self.board_size) 
@@ -41,7 +49,7 @@ class Neutreeko():
         locs.reverse()
         black = tuple(locs[:len(locs) // 2])
         white = tuple(locs[len(locs) // 2:])
-        turn = encoding // 10
+        turn = encoding
 
         return white, black, turn
 
@@ -53,6 +61,13 @@ class Neutreeko():
                 if x == self.board_height // 2 - 1:
                     white.append((x * self.board_length) + (x + 1))
                     black.append((self.board_height * self.board_length - 1) - (x * self.board_height) - x - 1)
+                    break
+                if x == self.board_height // 2 - 2 and self.board_height % 2 == 0:
+                    white.append((x * self.board_length) + (x + 1))
+                    white.append(((x + 1) * self.board_length) - 2 - x)
+                    black.append((self.board_height * self.board_length - 1) - (x * self.board_height) - x - 1)
+                    black.append((self.board_height * self.board_length - 1) - ((x + 1) * self.board_height) + (x + 2))
+                    break
                 else:
                     white.append((x * self.board_length) + (x + 1))
                     white.append(((x + 1) * self.board_length) - 2 - x)
@@ -60,9 +75,16 @@ class Neutreeko():
                     black.append((self.board_height * self.board_length - 1) - ((x + 1) * self.board_height) + (x + 2))
 
             else:
+                if x == self.board_height // 2 - 2 and self.board_height % 2 == 0:
+                    black.append((x * self.board_length) + (x + 1))
+                    black.append(((x + 1) * self.board_length) - 2 - x)
+                    white.append((self.board_height * self.board_length - 1) - (x * self.board_height) - x - 1)
+                    white.append((self.board_height * self.board_length - 1) - ((x + 1) * self.board_height) + (x + 2))
+                    break
                 if x == self.board_height // 2 - 1:
                     black.append((x * self.board_length) + (x + 1))
                     white.append((self.board_height * self.board_length - 1) - (x * self.board_height) - x - 1)
+                    break
                 else:
                     black.append((x * self.board_length) + (x + 1))
                     black.append(((x + 1) * self.board_length) - 2 - x)
@@ -78,30 +100,43 @@ class Neutreeko():
 
     #Very slow, can be improved and universalized
     def to_string(self, encode: int, mode: StringMode):
+        """
+        """
+        if self.stringType == None:
+            self.stringType = mode
+
         white, black, turn = self._decode(encode)
         if turn:
             turn = 'White'
         else:
             turn = 'Black'
 
-        board = [[f'B{black.index((self.board_height * column) + row) + 1}' 
-                    if ((self.board_height * column) + row in black) 
-                        else f'W{white.index((self.board_height * column) + row) + 1}' 
-                            if self.board_height * column + row in white 
-                                else '--' 
-                                    for row in reversed(range(self.board_length))] 
-                                        for column in reversed(range(self.board_height))]
-
-        merged = []
-        item = ''
-        for i in range(len(board)):
-            for j in range(len(board[0])):
-                item += ' ' 
-                item += board[i][j]
-            merged.append(item)
+        if mode == StringMode.TUI:
+            board = [[f'B{black.index((self.board_height * column) + row) + 1}' 
+                        if ((self.board_height * column) + row in black) 
+                            else f'W{white.index((self.board_height * column) + row) + 1}' 
+                                if self.board_height * column + row in white 
+                                    else '--' 
+                                        for row in range(self.board_length)] 
+                                            for column in range(self.board_height)]
+            merged = []
             item = ''
+            for i in range(len(board)):
+                for j in range(len(board[0])):
+                    item += ' ' 
+                    item += board[i][j]
+                merged.append(item)
+                item = ''
 
-        return '\n\n'.join(merged) + '\n' + f'Turn: {turn}'
+            return '\n\n'.join(merged) + '\n' + f'Turn: {turn}'
+        
+        elif mode == StringMode.AUTOGUI:
+            board = ['B' if ((self.board_height * column) + row in black) 
+                        else 'W' if self.board_height * column + row in white 
+                            else '-' for column in range(self.board_height) for row in range(self.board_length)]
+
+            turn = '1' if turn == 0 else '2'
+            return turn + "_" + "".join(board)
 
     def from_string(self, board_state: str):
         if board_state[-5] == "B":
@@ -137,11 +172,26 @@ class Neutreeko():
 
     def do_move(self,  encoding: int, encoded_move: int): 
         white, black, turn = self._decode(encoding) 
-        piece_number = encoded_move // 8 - 1
-        real_move = list(MOVE_ENCODE)[(encoded_move) % 8]
+
+        if self.stringType == StringMode.TUI:
+            piece_number = encoded_move // 8 - 1
+            real_move = list(MOVE_ENCODE)[(encoded_move) % 8]
+        
+        elif self.stringType == StringMode.AUTOGUI:
+            print(encoding, encoded_move)
+            if turn:
+                piece_number = white.index(encoded_move // 10)
+            else:
+                print(black)
+                print(encoded_move // 10)
+                piece_number = black.index(encoded_move // 10)
+            print(encoded_move)
+            real_move = list(MOVE_ENCODE)[(encoded_move) % 10]
 
         if turn:
+
             position = white[piece_number]
+            
             while self.can_move(position, real_move, encoding):
                 position += self.directions[real_move]
 
@@ -159,8 +209,8 @@ class Neutreeko():
             black[piece_number] = position
             black = tuple(black)
 
-        encode = self._encode(black, white, 1 - turn)
-
+            encode = self._encode(black, white, 1 - turn)
+        
         return encode
 
         # Pre-scan before making move
@@ -171,22 +221,41 @@ class Neutreeko():
     #Needs to return all pieces on the board and their possible positions
     def generate_moves(self, encoding):
         #Needs to be piece and move
-        white, black, turn = self._decode(encoding)
-        if turn:
-            position = white
-        else:
-            position = black
+        if self.stringType == StringMode.TUI:
+            white, black, turn = self._decode(encoding)
+            if turn:
+                position = white
+            else:
+                position = black
 
-        moves = []
-        if self.primitive(encoding) !=  None:
-            return moves # Maybe switch this, returns []
-        else:
-            #Moves encoded as piece (0, 1, 2) * move (0, 1, 2, 3, 4, 5, 6, 7)
-            for move in self.directions.keys():
-                for i in range(len(position)):
-                    if self.can_move(position[i], move, encoding):
-                        moves.append(MOVE_ENCODE[move] + (8 * (i + 1)))
-        
+            moves = []
+            if self.primitive(encoding) !=  None:
+                return moves # Maybe switch this, returns []
+            else:
+                #Moves encoded as piece (0, 1, 2) * move (0, 1, 2, 3, 4, 5, 6, 7)
+                for move in self.directions.keys():
+                    for i in range(len(position)):
+                        if self.can_move(position[i], move, encoding):
+                            moves.append(MOVE_ENCODE[move] + (8 * (i + 1)))
+
+        #AUTOGUI DIFFERENT MOVE STRING
+        elif self.stringType == StringMode.AUTOGUI:
+            white, black, turn = self._decode(encoding)
+            if turn:
+                position = white
+            else:
+                position = black
+
+            moves = []
+            if self.primitive(encoding) !=  None:
+                return moves # Maybe switch this, returns []
+            else:
+                #Moves encoded as piece (0, 1, 2) * move (0, 1, 2, 3, 4, 5, 6, 7)
+                for move in self.directions.keys():
+                    for i in range(len(position)):
+                        if self.can_move(position[i], move, encoding):
+                            moves.append(position[i] * 10 + move)
+            
         return moves
                 
 
@@ -212,15 +281,27 @@ class Neutreeko():
     def hash_ext(self, encode: int):
         return encode
 
-    def move_to_string(self, encoded_move: int, mode: StringMode):
-        piece_number = encoded_move // 8 - 1
-        real_move = list(MOVE_ENCODE)[encoded_move % 8]
 
-        return f'{piece_number + 1}{real_move}'
+    def move_to_string(self, encoded_move: int, mode: StringMode):
+
+        if mode == StringMode.TUI:
+            piece_number = encoded_move // 8 - 1
+            real_move = list(MOVE_ENCODE)[encoded_move % 8]
+
+            return f'{piece_number + 1}{real_move}'
+        elif mode == StringMode.AUTOGUI:
+            # Adjust encoding so it has move
+            real_move = list(MOVE_ENCODE)[encoded_move % 10]
+            src = encoded_move // 10
+            # from_cell = encoded_move // 10
+            # to_cell = encoded_move % 10
+
+            #M_source_destination_sound
+            return f'M_{src}_{src + self.directions[real_move]}_x'
 
 
 def main():
-    x = Neutreeko('111x111')
+    x = Neutreeko('5x5')
     encode = x.start()
 
     #Turn starts as black
@@ -228,7 +309,7 @@ def main():
 
         white, black, turn = x._decode(encode)
 
-        print(x.to_string(encode, None))
+        print(x.to_string(encode, StringMode.AUTOGUI))
 
         if turn:
             prime_position = white
@@ -239,6 +320,7 @@ def main():
         while statement:
             decoded_move = input('What move would you like to make? Select piece # and DIRECTION, i.e. 1NE: ')
             actual_move = ''
+            directioned_move = None
             while decoded_move:
                 if decoded_move[0] in MOVE_ENCODE:
                     directioned_move = decoded_move[:]
@@ -246,8 +328,8 @@ def main():
                 else:
                     actual_move += decoded_move[0]
                 decoded_move = decoded_move[1:]
-                
-            if directioned_move not in MOVE_ENCODE.keys() or int(actual_move) < 1 or int(actual_move) > len(black):
+            
+            if directioned_move == None or directioned_move not in MOVE_ENCODE.keys() or int(actual_move) < 1 or int(actual_move) > len(black):
                 print('Sorry! Move not valid')
 
             elif x.can_move(prime_position[int(actual_move) - 1], directioned_move, encode):
@@ -269,3 +351,11 @@ def main():
 
 
 #main()
+
+def test():
+    x = Neutreeko('5x5')
+    encode = x.start()
+    print(x.to_string(encode, 1))
+    print(x.to_string(encode, 2))
+
+#test()
